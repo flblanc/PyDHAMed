@@ -1,11 +1,9 @@
-from __future__ import print_function
-
 import numpy as np
 import numba
 import time
-from scipy.optimize import *
+from scipy.optimize import minimize
 
-from .prepare_dhamed import *
+from .prepare_dhamed import generate_dhamed_input
 
 
 @numba.jit(nopython=True)
@@ -59,19 +57,10 @@ def effective_log_likelihood_count_list(g,  ip, jp, ti, tj, vi, vj, nk, nijp,
     return xlogp + np.sum(nk*g)
 
 
-def effective_log_likelihood_count_ref(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
-    #g[-1] = 0
-    xlogp = 0
-    for ipair, i in enumerate(ip):
-        j = jp[ipair]
-        _vi = vi[ipair]
-        _vj = vj[ipair]
-        w = 0.5 * (_vi - g[i] + _vj - g[j])
-        taui = ti[ipair]*np.exp(_vi-g[i] -w)
-        tauj = tj[ipair]*np.exp(_vj-g[j] -w)
-        xlogp += nijp[ipair]* (np.log(taui+tauj)+w)
-
-    return xlogp + np.sum(nk*g)
+# Pure-Python fallback (no numba dispatch overhead / no numba dependency at
+# call time): the undecorated function underlying the jitted version above,
+# exposed by numba rather than kept as a hand-maintained duplicate.
+effective_log_likelihood_count_ref = effective_log_likelihood_count_list.py_func
 
 
 @numba.jit(nopython=True)
@@ -93,19 +82,7 @@ def grad_dhamed_likelihood(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
     return grad
 
 
-def grad_dhamed_likelihood_ref(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
-    #g[-1] = 0
-    grad = np.zeros(g.shape)
-    grad  += nk
-    for ipair, i in enumerate(ip):
-        j = jp[ipair]
-        vij = np.exp(vj[ipair]-g[j]-vi[ipair]+g[i])
-        # don't think I need to test if ti exists
-        if ti[ipair] > 0:
-            grad[i] += -nijp[ipair] / (1.0 + tj[ipair]*vij/ti[ipair])
-        if tj[ipair] >0 :
-            grad[j] += -nijp[ipair] / (1.0 + ti[ipair]/(vij*tj[ipair]))
-    return grad
+grad_dhamed_likelihood_ref = grad_dhamed_likelihood.py_func
 
 
 
@@ -165,8 +142,8 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
     Most parameters besides count_list and bias_ar are only relevant for testing
     and further code developement.
 
-    The function takes keywords arguments for fmin_bfgs() such as the gtol and
-    maxiter.
+    The function takes keyword arguments passed on as `options` to
+    scipy.optimize.minimize(method="BFGS"), such as gtol and maxiter.
 
     Parameters:
     -----------
@@ -219,9 +196,10 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
                             numerical_gradients=numerical_gradients, **kwargs)
 
     else:
-         og = fmin_bfgs(effective_log_likelihood_count_list, g_init*1.0,
-                        args=( ip -1, jp -1, ti, tj, vi, vj, n_out, nijp),
-              fprime=fprime, **kwargs)
+         result = minimize(effective_log_likelihood_count_list, g_init*1.0,
+                           args=(ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp),
+                           jac=fprime, method="BFGS", options=kwargs)
+         og = result.x
     end = time.time()
     print("time elapsed {} s".format(end-start))
 
@@ -252,7 +230,7 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
 
     # ip - 1, jp -1 : to get zero based indices
     print(wrapper_ll(g_prime,g, ip-1, jp-1, ti, tj, vi, vj, n_out, nijp, jit_gradient))
-    og = fmin_bfgs(wrapper_ll, g_prime,
-                   args=(g, ip -1, jp -1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
-                   fprime=fprime, **kwargs)
-    return np.append(og, 0)
+    result = minimize(wrapper_ll, g_prime,
+                      args=(g, ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
+                      jac=fprime, method="BFGS", options=kwargs)
+    return np.append(result.x, 0)

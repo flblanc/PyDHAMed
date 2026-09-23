@@ -1,6 +1,3 @@
-from __future__ import print_function
-from six.moves import range
-
 import numpy as np
 from collections import defaultdict
 
@@ -28,43 +25,8 @@ def state_lifetimes_counts(transition_count_matrix_l,
         nwin is number of windows with aggregate lifetimes in the states.
 
     """
-    #n = len(transition_count_matrix_l[0][:,0])
-    #nwin = len(transition_count_matrix_l)
-    t_ar = np.zeros((n,nwin), dtype=np.float64)
-
-    for iwin, win in enumerate(transition_count_matrix_l):
-        # sum over the column gives all counts in a state
-        t_ar[:, iwin] = np.sum(win, axis=0)
-    return t_ar
-
-
-def total_transition_counts(transition_count_matrix_l, n):
-    """
-    Parameters:
-    -----------
-    transition_count_matrix_l: list of arrays
-
-    Returns:
-    --------
-    nn_ar: array_like, total transitions j->i
-
-    """
-    #n = len(transition_count_matrix_l[0][:,0])
-    nn_ar = np.zeros((n,n))
-
-    # do j=1,n
-    #     do i=1,n
-    #        nn(i,j)=0.d0
-    #        do iwin=1,nwin
-    #           nn(i,j)=nn(i,j)+nij(i,j,iwin)
-    #        enddo
-    #     enddo
-
-    for j in range(n):
-        for i in range(n):
-            for iwin, win in enumerate(transition_count_matrix_l):
-                nn_ar[i,j] += win[i,j]
-    return nn_ar
+    # sum over the column gives all counts in a state
+    return np.stack(transition_count_matrix_l, axis=-1).sum(axis=0)
 
 
 def counts_in_out(transition_count_matrix_l, n, nwin):
@@ -91,13 +53,11 @@ def counts_in_out(transition_count_matrix_l, n, nwin):
     n_in = np.zeros(n)
     n_out = np.zeros(n)
 
-    #for k in range(n):
-    for iwin, count_matrix in enumerate(transition_count_matrix_l):
-        for i, row in enumerate(count_matrix):
-            for j, col_e in enumerate(row):
-                if i != j:
-                    n_in[i] += count_matrix[i,j]
-                    n_out[i] += count_matrix[j,i]
+    for count_matrix in transition_count_matrix_l:
+        diag = np.diag(count_matrix)
+        # row/column sums minus the diagonal exclude the i == j terms
+        n_in += count_matrix.sum(axis=1) - diag
+        n_out += count_matrix.sum(axis=0) - diag
     return n_in, n_out
 
 

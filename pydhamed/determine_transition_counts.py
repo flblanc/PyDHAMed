@@ -1,6 +1,5 @@
 import numpy as np
 from collections import Counter
-import six
 
 
 def count_matrix(traj, lag=1, n_states=None):
@@ -17,7 +16,7 @@ def count_matrix(traj, lag=1, n_states=None):
         n_states = np.max(traj) + 1  # traj uses 0-based state indices
     b = np.zeros((n_states, n_states))
 
-    for (x, y), c in six.iteritems(Counter(zip(traj[:-lag], traj[lag:]))):
+    for (x, y), c in Counter(zip(traj[:-lag], traj[lag:])).items():
         #b[x-1, y-1] = c
         b[int(y), int(x)] = c
 
@@ -40,7 +39,3 @@ def loop_traj_count_matrix(traj_dict, lag=1, n_states=None, trj1_index="0"):
         count_matrix_comb += v
 
     return count_matrix_comb
-
-
-def index2d_1d(i, j, M=100):
-    return i*M + j
