@@ -19,5 +19,5 @@ setup(name='PyDHAMed',
       author_email='flyingcircus@example.com',
       install_requires=REQUIRED,
       license='BSD-3-Clause',
-      packages=['pydhamed'],
+      packages=find_packages(),
       zip_safe=False)

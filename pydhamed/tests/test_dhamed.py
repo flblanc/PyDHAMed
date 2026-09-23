@@ -15,3 +15,12 @@ def test_cg_rna_pmf_with_reference(data):
     f_rna = cg_rna_ref[:,-1] - cg_rna_ref[-1,-1]
 
     assert_almost_equal(f_rna, py_rna)
+
+
+def test_run_dhamed_default_g_init(data):
+    """run_dhamed must accept the default g_init=None, as shown in the README."""
+    c_l = [np.genfromtxt(data["count_matrix_1.txt"])]
+    v_ar = np.genfromtxt(data["wfile.txt"])[:,1].reshape((9,1))
+
+    og = run_dhamed(c_l, -np.log(v_ar), maxiter=10000)
+    assert og.shape == (9,)
