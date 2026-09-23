@@ -1,5 +1,4 @@
-from __future__ import print_function
-from collections import defaultdict, Counter
+from collections import Counter
 import numpy as np
 
 

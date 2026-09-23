@@ -7,5 +7,4 @@ dependencies:
   - scipy
   - pandas
   - numba
-  - six
 

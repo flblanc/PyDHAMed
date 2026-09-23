@@ -1,6 +1,3 @@
-from __future__ import print_function
-from six.moves import range
-
 import numpy as np
 from collections import defaultdict
 
