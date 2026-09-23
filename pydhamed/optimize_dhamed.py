@@ -1,7 +1,7 @@
 import numpy as np
 import numba
 import time
-from scipy.optimize import fmin_bfgs
+from scipy.optimize import minimize
 
 from .prepare_dhamed import generate_dhamed_input
 
@@ -142,8 +142,8 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
     Most parameters besides count_list and bias_ar are only relevant for testing
     and further code developement.
 
-    The function takes keywords arguments for fmin_bfgs() such as the gtol and
-    maxiter.
+    The function takes keyword arguments passed on as `options` to
+    scipy.optimize.minimize(method="BFGS"), such as gtol and maxiter.
 
     Parameters:
     -----------
@@ -196,9 +196,10 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
                             numerical_gradients=numerical_gradients, **kwargs)
 
     else:
-         og = fmin_bfgs(effective_log_likelihood_count_list, g_init*1.0,
-                        args=( ip -1, jp -1, ti, tj, vi, vj, n_out, nijp),
-              fprime=fprime, **kwargs)
+         result = minimize(effective_log_likelihood_count_list, g_init*1.0,
+                           args=(ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp),
+                           jac=fprime, method="BFGS", options=kwargs)
+         og = result.x
     end = time.time()
     print("time elapsed {} s".format(end-start))
 
@@ -229,7 +230,7 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
 
     # ip - 1, jp -1 : to get zero based indices
     print(wrapper_ll(g_prime,g, ip-1, jp-1, ti, tj, vi, vj, n_out, nijp, jit_gradient))
-    og = fmin_bfgs(wrapper_ll, g_prime,
-                   args=(g, ip -1, jp -1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
-                   fprime=fprime, **kwargs)
-    return np.append(og, 0)
+    result = minimize(wrapper_ll, g_prime,
+                      args=(g, ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
+                      jac=fprime, method="BFGS", options=kwargs)
+    return np.append(result.x, 0)

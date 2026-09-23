@@ -39,7 +39,3 @@ def loop_traj_count_matrix(traj_dict, lag=1, n_states=None, trj1_index="0"):
         count_matrix_comb += v
 
     return count_matrix_comb
-
-
-def index2d_1d(i, j, M=100):
-    return i*M + j
