@@ -194,7 +194,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
                                                                           n_states,
                                                                           n_windows,
                                                                           return_included_state_indices=False)
-    if np.all(g_init) is None:
+    if g_init is None:
        g_init = np.zeros(n_actual)
 
     start = time.time()

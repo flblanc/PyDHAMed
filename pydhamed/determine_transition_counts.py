@@ -14,7 +14,7 @@ def count_matrix(traj, lag=1, n_states=None):
 
     """
     if n_states is None:
-        n_states = np.max(traj)  # 0 or zero based indexing?
+        n_states = np.max(traj) + 1  # traj uses 0-based state indices
     b = np.zeros((n_states, n_states))
 
     for (x, y), c in six.iteritems(Counter(zip(traj[:-lag], traj[lag:]))):
@@ -32,9 +32,11 @@ def loop_traj_count_matrix(traj_dict, lag=1, n_states=None, trj1_index="0"):
         count_matrix_dict[k] = count_matrix(v, lag=lag, n_states=n_states)
 
     # assuming zero based trajectory indexing
-    count_matrix_comb = count_matrix_dict[trj1_index]
+    count_matrix_comb = count_matrix_dict[trj1_index].copy()
 
     for k, v in count_matrix_dict.items():
+        if k == trj1_index:
+            continue
         count_matrix_comb += v
 
     return count_matrix_comb

@@ -58,8 +58,15 @@ columns and contains the bias acting on each state in each simulation (window).
 The bias NEEDS to be given in units to kB_T.
     
 Most parameters besides count_list and bias_ar are only relevant for testing
-and further code developement. 
-    
+and further code developement.
+
+State indexing is 0-based throughout the main pipeline (count matrices,
+bias arrays, ``determine_transition_counts.count_matrix``). The
+``pop_from_tba_eq_traj`` / ``block_average_pop_eq_tba`` helpers in
+``analyze_eq_md.py`` instead assume 1-based state labels in their input
+trajectory; this is a separate, unrelated input format and not
+interchangeable with the count-matrix pipeline above.
+
 
 To run DHAMed
 =============
@@ -78,8 +85,8 @@ To run DHAMed
 
   # Bias - need to specfiy the bias acting on each of the n states in the nwin simulation. 
   bias_ar = np.zeros((n, nwin))
-  for i in range(n)
-      bias_ar[i,:] = np.loadtxt("bias"+i)
+  for i in range(n):
+      bias_ar[i,:] = np.loadtxt("bias"+str(i))
 
   # run optimization
   og = run_dhamed(count_list, bias_ar)

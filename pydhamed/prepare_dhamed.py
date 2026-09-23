@@ -244,7 +244,7 @@ def prepare_dhamed_input_pairs(n_states, transition_count_matrix_l,
             # test whether transition in/out of paired states i and j were observed
             if (n_in[i] > 0.0) and (n_out[i] > 0.0) and (paired_ar[i] > 0 ):
                 for j in range(i+1, n_states):
-                     if (n_in[j] > 0.0) and (n_out[j] > 0.0) and (paired_ar[i] > 0 ):
+                     if (n_in[j] > 0.0) and (n_out[j] > 0.0) and (paired_ar[j] > 0 ):
                             # transition in current window?
                             if count_matrix[i,j] + count_matrix[j,i] > 0:
                                 if (t_ar[i, iwin] + t_ar[j, iwin] > 0.0):
