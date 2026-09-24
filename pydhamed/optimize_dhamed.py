@@ -92,23 +92,27 @@ def grad_dhamed_likelihood(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
 grad_dhamed_likelihood_ref = grad_dhamed_likelihood.py_func
 
 
-def wrapper_ll(g_prime, ip, jp, ti, tj, vi, vj, nk, nijp,
-               jit_gradient=False):
+def wrapper_ll(g_prime, data, jit_gradient=False):
     """
     Adding the extra zero when minimizing N-1 relative weights.
+
+    Parameters:
+    -----------
+    data: DhamedPairData
+        Per-pair inputs and per-state transition counts (see
+        generate_dhamed_input).
     """
     g_i = np.append(g_prime, [0], axis=0)
-    l = effective_log_likelihood_count_list(g_i,  ip, jp, ti, tj, vi, vj, nk, nijp)
-    return l
+    return effective_log_likelihood_count_list(g_i, data.ip, data.jp, data.ti, data.tj,
+                                               data.vi, data.vj, data.nk, data.nijp)
 
 
-def grad_dhamed_likelihood_ref_0(g_prime, ip, jp, ti, tj, vi, vj, nk, nijp,
-                                jit_gradient=False):
+def grad_dhamed_likelihood_ref_0(g_prime, data, jit_gradient=False):
     g = np.append(g_prime, [0], axis=0)
     grad = np.zeros(g.shape[0] )
-    grad[:-1]  += nk[:-1]
+    grad[:-1]  += data.nk[:-1]
     loop = _loop_grad_dhamed_likelihood_0 if jit_gradient else _loop_grad_dhamed_likelihood_0_ref
-    grad = loop(grad, g, ip, jp, ti, tj, vi, vj, nijp)
+    grad = loop(grad, g, data.ip, data.jp, data.ti, data.tj, data.vi, data.vj, data.nijp)
     return grad[:-1]
 
 
@@ -149,12 +153,9 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
 
     n_states = count_list[0].shape[0]
 
-    n_out, ip, jp, vi, vj, ti, tj, nijp, n_actual = generate_dhamed_input(count_list,
-                                                                          bias_ar,
-                                                                          n_states,
-                                                                          return_included_state_indices=False)
+    data = generate_dhamed_input(count_list, bias_ar, n_states)
     if g_init is None:
-       g_init = np.zeros(n_actual)
+       g_init = np.zeros(len(data.nk))
 
     start = time.time()
 
@@ -167,12 +168,13 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
               fprime = grad_dhamed_likelihood_ref
 
     if last_g_zero:
-       og = min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=jit_gradient,
+       og = min_dhamed_bfgs(g_init, data, jit_gradient=jit_gradient,
                             numerical_gradients=numerical_gradients, **kwargs)
 
     else:
          result = minimize(effective_log_likelihood_count_list, g_init*1.0,
-                           args=(ip, jp, ti, tj, vi, vj, n_out, nijp),
+                           args=(data.ip, data.jp, data.ti, data.tj, data.vi, data.vj,
+                                 data.nk, data.nijp),
                            jac=fprime, method="BFGS", options=kwargs)
          og = result.x
     end = time.time()
@@ -181,7 +183,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
     return og
 
 
-def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=False,
+def min_dhamed_bfgs(g_init, data, jit_gradient=False,
                     numerical_gradients=False, **kwargs):
     """
     Find the optimal weights to solve the DHAMed equations by
@@ -190,7 +192,9 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
     Parameters:
     -----------
     g_init: array, N entries, initial log weights
-    ip: array of integers,
+    data: DhamedPairData
+        Per-pair inputs and per-state transition counts (see
+        generate_dhamed_input).
 
     """
     g_prime = g_init[:-1].T
@@ -201,6 +205,6 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
         fprime=grad_dhamed_likelihood_ref_0
 
     result = minimize(wrapper_ll, g_prime,
-                      args=(ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient),
+                      args=(data, jit_gradient),
                       jac=fprime, method="BFGS", options=kwargs)
     return np.append(result.x, 0)
