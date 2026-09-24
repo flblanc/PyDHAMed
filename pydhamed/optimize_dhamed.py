@@ -166,14 +166,13 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
          else:
               fprime = grad_dhamed_likelihood_ref
 
-    # ip - 1, jp -1 : to get zero based indices
     if last_g_zero:
        og = min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=jit_gradient,
                             numerical_gradients=numerical_gradients, **kwargs)
 
     else:
          result = minimize(effective_log_likelihood_count_list, g_init*1.0,
-                           args=(ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp),
+                           args=(ip, jp, ti, tj, vi, vj, n_out, nijp),
                            jac=fprime, method="BFGS", options=kwargs)
          og = result.x
     end = time.time()
@@ -201,8 +200,7 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
     else:
         fprime=grad_dhamed_likelihood_ref_0
 
-    # ip - 1, jp -1 : to get zero based indices
     result = minimize(wrapper_ll, g_prime,
-                      args=(ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
+                      args=(ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient),
                       jac=fprime, method="BFGS", options=kwargs)
     return np.append(result.x, 0)

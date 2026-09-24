@@ -201,8 +201,8 @@ def prepare_dhamed_input_pairs(n_states, transition_count_matrix_l,
                                 if (t_ar[i, iwin] + t_ar[j, iwin] > 0.0):
                                     # lifetime > 0
                                     n_pair += 1
-                                    ip_l.append(pair_idx_d[i][0] + 1) # where is the +1 coming from? N.B.: it is removed later on. 
-                                    jp_l.append(pair_idx_d[j][0] + 1)
+                                    ip_l.append(pair_idx_d[i][0])
+                                    jp_l.append(pair_idx_d[j][0])
                                     vi.append(v_ar[i,iwin])
                                     vj.append(v_ar[j,iwin])
                                     ti.append(t_ar[i,iwin])
