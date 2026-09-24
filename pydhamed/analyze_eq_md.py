@@ -12,7 +12,6 @@ def pop_from_tba_eq_traj(tba, verbose=False, n_states=32):
         if verbose:
             print(s, c)
         p_i = c/ float(traj_time)
-        #p_l.append(p_i)
         p_ar[s-1] = p_i
     return p_ar
 

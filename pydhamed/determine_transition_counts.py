@@ -17,7 +17,6 @@ def count_matrix(traj, lag=1, n_states=None):
     b = np.zeros((n_states, n_states))
 
     for (x, y), c in Counter(zip(traj[:-lag], traj[lag:])).items():
-        #b[x-1, y-1] = c
         b[int(y), int(x)] = c
 
     return b

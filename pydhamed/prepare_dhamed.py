@@ -1,22 +1,16 @@
 import numpy as np
 from collections import defaultdict
 
-def state_lifetimes_counts(transition_count_matrix_l,
-                           n, nwin):
+def state_lifetimes_counts(transition_count_matrix_l):
     """
-    
+
     Calculate lifetimes in each of the states (for each run/window)
-    
+
     Parameters:
     -----------
     transition_count_matrix_l: list of arrays
         List of arrays with transition count matrices. One array for
-        each run/windows. 
-    n: int
-        Number of (structural) states
-    nwin: int
-        Number of simulations runs/windows. I.e., how many umbrella
-        winodws were run.    
+        each run/windows.
 
     Returns:
     --------
@@ -29,18 +23,15 @@ def state_lifetimes_counts(transition_count_matrix_l,
     return np.stack(transition_count_matrix_l, axis=-1).sum(axis=0)
 
 
-def counts_in_out(transition_count_matrix_l, n, nwin):
+def counts_in_out(transition_count_matrix_l, n):
     """
     Parameters:
     -----------
     transition_count_matrix_l: list of arrays
         List of arrays with transition count matrices. One array for
-        each run/windows. 
+        each run/windows.
     n: int
         Number of (structural) states
-    nwin: int
-        Number of simulations runs/windows. I.e., how many umbrella
-        winodws were run.    
 
     Returns:
     --------
@@ -253,7 +244,7 @@ def check_total_transition_counts(n_out, n_in, paired_ar, n_actual):
     return n_k
 
 
-def generate_dhamed_input(c_l, v_ar, n_states, n_win, return_included_state_indices=False):
+def generate_dhamed_input(c_l, v_ar, n_states, return_included_state_indices=False):
     """
     Converts a list of count matrices and an array of bias potentials
     to the input for DHAMed. For efficient calculation DHAMed input data
@@ -267,8 +258,6 @@ def generate_dhamed_input(c_l, v_ar, n_states, n_win, return_included_state_indi
         Array of bias potentials
     n_states: int
         Number of states/bins.
-    n_win: int
-        Number of simulation runs or windows.
     return_included_state_indices: boolean, optional
         Return indices of the states to be included in the calculation.
 
@@ -297,8 +286,8 @@ def generate_dhamed_input(c_l, v_ar, n_states, n_win, return_included_state_indi
         Indices of states included in the DHAMed calculation (optional)
 
     """
-    t = state_lifetimes_counts(c_l, n_states, n_win)
-    n_in, n_out = counts_in_out(c_l, n_states, n_win)
+    t = state_lifetimes_counts(c_l)
+    n_in, n_out = counts_in_out(c_l, n_states)
     paired_ar = check_transition_pairs(c_l, n_in, n_out, n_states, t)
     pair_idx_d, n_actual = actual_transition_pairs(n_in, n_out, n_states, paired_ar)
     ip, jp, vi, vj, ti, tj, nijp  = prepare_dhamed_input_pairs(n_states, c_l, n_in, n_out,

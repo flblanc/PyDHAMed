@@ -40,10 +40,7 @@ def effective_log_likelihood_count_list(g,  ip, jp, ti, tj, vi, vj, nk, nijp,
     --------
     F: float
         Effective negative log-likelihood for DHAMed.
-    """                                    
-                                        
-    #g[-1] = 0
-    #g = np.append(g_i, 0)
+    """
     xlogp = 0
     for ipair, i in enumerate(ip):
         j = jp[ipair]
@@ -64,13 +61,11 @@ effective_log_likelihood_count_ref = effective_log_likelihood_count_list.py_func
 
 
 @numba.jit(nopython=True)
-#@numba.jit(numba.float64[:](numba.float64[:],numba.types.int8[:],numba.types.int8[:],
-#          numba.float64[:],numba.float64[:],numba.float64[:],numba.float64[:],
-#          numba.types.int8[:],numba.types.int8[:]),nopython=True)
-def grad_dhamed_likelihood(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
-    #g[-1] = 0
-    grad = np.zeros(g.shape)
-    grad  += nk
+def _loop_grad_dhamed_likelihood_0(grad, g,  ip, jp, ti, tj, vi, vj, nijp):
+    """
+    Shared inner loop accumulating the pairwise contributions to the gradient
+    of the effective log-likelihood into `grad`.
+    """
     for ipair, i in enumerate(ip):
         j = jp[ipair]
         vij = np.exp(vj[ipair]-g[j]-vi[ipair]+g[i])
@@ -82,11 +77,22 @@ def grad_dhamed_likelihood(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
     return grad
 
 
+# Pure-Python fallback: the undecorated function underlying the jitted version
+# above, exposed by numba rather than kept as a hand-maintained duplicate.
+_loop_grad_dhamed_likelihood_0_ref = _loop_grad_dhamed_likelihood_0.py_func
+
+
+@numba.jit(nopython=True)
+def grad_dhamed_likelihood(g,  ip, jp, ti, tj, vi, vj, nk, nijp):
+    grad = np.zeros(g.shape)
+    grad += nk
+    return _loop_grad_dhamed_likelihood_0(grad, g, ip, jp, ti, tj, vi, vj, nijp)
+
+
 grad_dhamed_likelihood_ref = grad_dhamed_likelihood.py_func
 
 
-
-def wrapper_ll(g_prime, g, ip, jp, ti, tj, vi, vj, nk, nijp,
+def wrapper_ll(g_prime, ip, jp, ti, tj, vi, vj, nk, nijp,
                jit_gradient=False):
     """
     Adding the extra zero when minimizing N-1 relative weights.
@@ -96,32 +102,14 @@ def wrapper_ll(g_prime, g, ip, jp, ti, tj, vi, vj, nk, nijp,
     return l
 
 
-def grad_dhamed_likelihood_ref_0(g_prime, g,  ip, jp, ti, tj, vi, vj, nk, nijp,
+def grad_dhamed_likelihood_ref_0(g_prime, ip, jp, ti, tj, vi, vj, nk, nijp,
                                 jit_gradient=False):
     g = np.append(g_prime, [0], axis=0)
     grad = np.zeros(g.shape[0] )
     grad[:-1]  += nk[:-1]
-    if jit_gradient:
-        grad = _loop_grad_dhamed_likelihood_0_jit(grad,g, ip, jp, ti, tj, vi, vj, nijp)
-    else:
-        grad = _loop_grad_dhamed_likelihood_0(grad,g, ip, jp, ti, tj, vi, vj, nijp)
+    loop = _loop_grad_dhamed_likelihood_0 if jit_gradient else _loop_grad_dhamed_likelihood_0_ref
+    grad = loop(grad, g, ip, jp, ti, tj, vi, vj, nijp)
     return grad[:-1]
-
-
-
-def _loop_grad_dhamed_likelihood_0(grad, g,  ip, jp, ti, tj, vi, vj, nijp):
-    for ipair, i in enumerate(ip):
-        j = jp[ipair]
-        vij = np.exp(vj[ipair]-g[j]-vi[ipair]+g[i])
-        # don't think I need to test if ti exists
-        if ti[ipair] > 0:
-            grad[i] += -nijp[ipair] / (1.0 + tj[ipair]*vij/ti[ipair])
-        if tj[ipair] >0 :
-            grad[j] += -nijp[ipair] / (1.0 + ti[ipair]/(vij*tj[ipair]))
-    return grad
-
-
-_loop_grad_dhamed_likelihood_0_jit = numba.jit(_loop_grad_dhamed_likelihood_0, nopython=True)
 
 
 def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
@@ -160,16 +148,10 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
     """
 
     n_states = count_list[0].shape[0]
-    n_windows = bias_ar.shape[1]
-
-
-    #u_min = np.min(bias_ar, axis=0)
-    #bias_ar -= u_min
 
     n_out, ip, jp, vi, vj, ti, tj, nijp, n_actual = generate_dhamed_input(count_list,
                                                                           bias_ar,
                                                                           n_states,
-                                                                          n_windows,
                                                                           return_included_state_indices=False)
     if g_init is None:
        g_init = np.zeros(n_actual)
@@ -184,13 +166,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
          else:
               fprime = grad_dhamed_likelihood_ref
 
-    #print(g_init, ip -1, jp -1, ti, tj, vi, vj, n_out, nijp)
-
     # ip - 1, jp -1 : to get zero based indices
-    #l0 = effective_log_likelihood_count_list(g_init*1.0, ip -1, jp -1, ti, tj, vi, vj,
-    #                                          n_out, nijp)
-    #print ("loglike-start {}".format(l0))
-
     if last_g_zero:
        og = min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=jit_gradient,
                             numerical_gradients=numerical_gradients, **kwargs)
@@ -203,9 +179,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
     end = time.time()
     print("time elapsed {} s".format(end-start))
 
-    #correct optimal log weights by adding back umin
-    #output free energies are relative to the last bias!
-    return og #+ u_min #- u_min[-1]
+    return og
 
 
 def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=False,
@@ -220,8 +194,7 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
     ip: array of integers,
 
     """
-    g = g_init.copy()
-    g_prime = g[:-1].T
+    g_prime = g_init[:-1].T
 
     if numerical_gradients:
         fprime=None
@@ -229,8 +202,7 @@ def min_dhamed_bfgs(g_init, ip, jp, ti, tj, vi, vj, n_out, nijp, jit_gradient=Fa
         fprime=grad_dhamed_likelihood_ref_0
 
     # ip - 1, jp -1 : to get zero based indices
-    print(wrapper_ll(g_prime,g, ip-1, jp-1, ti, tj, vi, vj, n_out, nijp, jit_gradient))
     result = minimize(wrapper_ll, g_prime,
-                      args=(g, ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
+                      args=(ip - 1, jp - 1, ti, tj, vi, vj, n_out, nijp, jit_gradient),
                       jac=fprime, method="BFGS", options=kwargs)
     return np.append(result.x, 0)
