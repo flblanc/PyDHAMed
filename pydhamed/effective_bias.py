@@ -40,7 +40,10 @@ def effective_bias(u_kn, state_n, run_n, n_states=None, return_frame_weights=Fal
     bias_ar: array (n_states, n_runs), the DHAMed bias array (NaN for states without frames);
     (log_w_n: array (n_frames,), if return_frame_weights).
     """
-    from pymbar import MBAR
+    try:
+        from pymbar import MBAR
+    except ImportError as error:
+        raise ImportError("effective_bias needs pymbar >= 4: pip install PyDHAMed[mbar]") from error
     from scipy.special import logsumexp
 
     u_kn = np.asarray(u_kn, dtype=float)

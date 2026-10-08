@@ -2,7 +2,10 @@ import io
 from setuptools import find_packages, setup
 import os
 
-REQUIRED = ['numpy', 'scipy', 'pandas', 'numba', 'pymbar>=4']
+REQUIRED = ['numpy', 'scipy', 'pandas', 'numba']
+
+# effective_bias (biases not constant within states) needs pymbar: pip install PyDHAMed[mbar]
+EXTRAS = {'mbar': ['pymbar>=4']}
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -18,6 +21,7 @@ setup(name='PyDHAMed',
       author='Lukas Stelzl, Gerhard Hummer',
       author_email='flyingcircus@example.com',
       install_requires=REQUIRED,
+      extras_require=EXTRAS,
       license='BSD-3-Clause',
       packages=find_packages(),
       zip_safe=False)

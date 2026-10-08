@@ -111,7 +111,8 @@ Biases that are not constant within states
 
 When the bias varies within a state (macrostates, temperature replica exchange with
 u(x) = (beta_a - beta) U(x)), the effective bias factors e^{-u_i^a} = <e^{-u^a(x)}>_i are
-obtained by binless WHAM restricted to each state (eqs 36-39), solved with pymbar (MBAR):
+obtained by binless WHAM restricted to each state (eqs 36-39), solved with pymbar (MBAR).
+This needs the optional pymbar dependency: ``pip install .[mbar]``.
 
 .. code:: python
 

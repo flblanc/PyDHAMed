@@ -74,6 +74,7 @@ def test_rates_tst_model(biased_runs):
 
 
 def test_effective_bias_constant_within_states():
+    pytest.importorskip("pymbar")
     rng = np.random.default_rng(1)
     n_runs, n_states = 3, 4
     true = rng.normal(0, 1, (n_states, n_runs))
@@ -84,6 +85,7 @@ def test_effective_bias_constant_within_states():
 
 
 def test_effective_bias_variable_within_state():
+    pytest.importorskip("pymbar")
     # One state, x uniform on [0, 1) in the unbiased ensemble, runs at bias u_a(x) = c_a x; sample each run exactly.
     rng = np.random.default_rng(2)
     c = np.array([0.0, 2.0, 5.0])
