@@ -2,7 +2,7 @@ import io
 from setuptools import find_packages, setup
 import os
 
-REQUIRED = [ 'numpy', 'scipy', 'pandas', 'numba']
+REQUIRED = ['numpy', 'scipy', 'pandas', 'numba', 'pymbar>=4']
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -12,7 +12,7 @@ with io.open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = '\n' + f.read()
 
 setup(name='PyDHAMed',
-      version='0.1',
+      version='0.2.0',
       description='Dynamic Histogram Analysis To Determine Free Energies and Rates from Biased Simulations',
       url='https://github.com/bio-phys/PyDHAMed',
       author='Lukas Stelzl, Gerhard Hummer',

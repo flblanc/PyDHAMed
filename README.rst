@@ -91,6 +91,39 @@ To run DHAMed
   # run optimization
   og = run_dhamed(count_list, bias_ar)
  
+Result object, statistical errors and rates
+===========================================
+
+``solve_dhamed`` takes the same inputs as ``run_dhamed`` and returns a ``DhamedResult``:
+
+.. code:: python
+
+  from pydhamed import solve_dhamed
+
+  res = solve_dhamed(count_list, bias_ar)
+  res.populations              # p_i, normalised; 0 for excluded states
+  res.free_energies            # -ln p_i in kT, NaN for excluded states
+  res.free_energy_errors()     # standard errors from the Hessian of F (eqs 14-18)
+  K = res.rate_matrix("tst", dt=lag_time)   # K[i, j]: rate j -> i (eq 26, rate models of eqs 27-30)
+
+Biases that are not constant within states
+==========================================
+
+When the bias varies within a state (macrostates, temperature replica exchange with
+u(x) = (beta_a - beta) U(x)), the effective bias factors e^{-u_i^a} = <e^{-u^a(x)}>_i are
+obtained by binless WHAM restricted to each state (eqs 36-39), solved with pymbar (MBAR):
+
+.. code:: python
+
+  from pydhamed import effective_bias
+
+  # u_kn: reduced bias energy (kT) of every frame in every run; state_n, run_n: per-frame state and run
+  bias_ar, log_w = effective_bias(u_kn, state_n, run_n, return_frame_weights=True)
+  res = solve_dhamed(count_list, bias_ar)
+  # unbiased frame weights for other observables: exp(log_w) * res.populations[state_n]
+
+Progress messages go to the ``pydhamed`` logger instead of being printed.
+
 DHAMed examples
 ===============
 

@@ -1,9 +1,14 @@
+import logging
+import time
+
 import numpy as np
 import numba
-import time
 from scipy.optimize import minimize
 
 from .prepare_dhamed import generate_dhamed_input
+from .result import DhamedResult
+
+logger = logging.getLogger("pydhamed")
 
 
 @numba.jit(nopython=True)
@@ -116,6 +121,35 @@ def grad_dhamed_likelihood_ref_0(g_prime, data, jit_gradient=False):
     return grad[:-1]
 
 
+def solve_dhamed(count_list, bias_ar, g_init=None, numerical_gradients=False, jit_gradient=False, **kwargs):
+    """
+    Solve the DHAMed equations (Stelzl, Kells, Rosta, Hummer, JCTC 13, 6328 (2017), eq 12) and return a
+    DhamedResult with the populations, free energies, their statistical errors (eqs 14-18) and rates (eq 26).
+
+    Parameters:
+    -----------
+    count_list: list of arrays, NxN transition counts for each simulation (window), C[i, j] = number of j -> i
+                transitions within the lag time; the diagonal holds the counts of staying in a state.
+    bias_ar: array, (N x nwin) bias acting on each state in each simulation, in units of kT
+             (see effective_bias for biases that are not constant within states).
+    g_init: initial log-weights of all N states (excluded states are dropped).
+    Other keyword arguments are passed as options to scipy.optimize.minimize(method="BFGS").
+    """
+    n_states = count_list[0].shape[0]
+    data, state_index = generate_dhamed_input(count_list, bias_ar, n_states, return_included_state_indices=True)
+    included = np.zeros(n_states, dtype=bool)
+    included[list(state_index)] = True
+    g0 = np.zeros(len(data.nk)) if g_init is None else np.asarray(g_init, dtype=float)[included]
+
+    start = time.time()
+    fprime = None if numerical_gradients else grad_dhamed_likelihood_ref_0
+    result = minimize(wrapper_ll, g0[:-1], args=(data, jit_gradient), jac=fprime, method="BFGS", options=kwargs)
+    logger.info("DHAMed: %d states, %d transition pairs, %d iterations, %.2f s",
+                len(data.nk), len(data.ip), result.nit, time.time() - start)
+    g = np.append(result.x, 0.0)
+    return DhamedResult(g=g - np.log(np.sum(np.exp(g))), included=included, data=data, optimizer=result)
+
+
 def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
                jit_gradient=False, last_g_zero=True, **kwargs):
     """
@@ -132,7 +166,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
     (or window in umbrella sampling. The bias NEEDS to be given in units to kBT.
 
     Most parameters besides count_list and bias_ar are only relevant for testing
-    and further code developement.
+    and further code developement. solve_dhamed returns a DhamedResult with errors and rates.
 
     The function takes keyword arguments passed on as `options` to
     scipy.optimize.minimize(method="BFGS"), such as gtol and maxiter.
@@ -148,7 +182,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
 
     Returns:
     --------
-    og: array-like, optimized log-weights
+    og: array-like, optimized log-weights of the included states (last one set to 0)
     """
 
     n_states = count_list[0].shape[0]
@@ -177,8 +211,7 @@ def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
                                  data.nk, data.nijp),
                            jac=fprime, method="BFGS", options=kwargs)
          og = result.x
-    end = time.time()
-    print("time elapsed {} s".format(end-start))
+    logger.info("time elapsed %.2f s", time.time() - start)
 
     return og
 

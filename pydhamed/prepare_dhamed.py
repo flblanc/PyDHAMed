@@ -1,6 +1,10 @@
-import numpy as np
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
+
+import numpy as np
+
+logger = logging.getLogger("pydhamed")
 
 
 def state_lifetimes_counts(transition_count_matrix_l):
@@ -180,9 +184,9 @@ def actual_transition_pairs(eligible, paired_ar, n_states, verbose=False):
             pair_idx_d[i].append(n_actual)
             n_actual += 1
         else:
-            print("bin {} excluded".format(i))
+            logger.info("bin %d excluded", i)
     if verbose:
-        print(n_actual)
+        logger.info("%d states included", n_actual)
     return pair_idx_d, n_actual
 
 
@@ -243,7 +247,7 @@ def prepare_dhamed_input_pairs(transition_count_matrix_l, pairs, t_ar, pair_idx_
         tj.append(t_ar[j, iwin])
         nijp.append(count_matrix[i, j] + count_matrix[j, i])
 
-    print("Number of transition pairs {}".format(len(pairs)))
+    logger.info("Number of transition pairs %d", len(pairs))
     return (np.array(ip_l, dtype=int), np.array(jp_l, dtype=int),
             np.array(vi), np.array(vj), np.array(ti), np.array(tj), np.array(nijp))
 
