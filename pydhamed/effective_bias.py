@@ -14,7 +14,8 @@ M. R. Shirts, J. D. Chodera, J. Chem. Phys. 129, 124105 (2008) (MBAR).
 import numpy as np
 
 
-def effective_bias(u_kn, state_n, run_n, n_states=None, return_frame_weights=False, **mbar_kwargs):
+def effective_bias(u_kn, state_n, run_n, n_states=None, return_frame_weights=False, initial_f_k=None,
+                   max_iterations=1000, **mbar_kwargs):
     """
     Effective bias factors u_i^a (kT) of every state i in every run a.
 
@@ -28,7 +29,11 @@ def effective_bias(u_kn, state_n, run_n, n_states=None, return_frame_weights=Fal
     return_frame_weights: also return, for every frame, its log-weight in the unbiased distribution within its
         own state (normalised to sum to one within each state; -inf for unassigned frames). Multiplied by the
         DHAMed populations p_i, these give unbiased frame weights for observables other than the states.
-    mbar_kwargs: passed to pymbar.MBAR.
+    initial_f_k: optional free energies (kT) of the runs from a global MBAR, used as starting point for every
+        state. Otherwise each state starts from the solution of the previous one (the per-state free energies of
+        the runs differ little between states), which makes large problems (e.g. 64 temperatures) much faster.
+    max_iterations: iteration cap of pymbar's adaptive solver for each state.
+    mbar_kwargs: passed to pymbar.MBAR (e.g. a different solver_protocol).
 
     Returns:
     --------
@@ -46,6 +51,9 @@ def effective_bias(u_kn, state_n, run_n, n_states=None, return_frame_weights=Fal
     bias_ar = np.full((n_states, n_runs), np.nan)
     log_w_n = np.full(len(state_n), -np.inf)
     mbar_kwargs.setdefault("verbose", False)
+    mbar_kwargs.setdefault("solver_protocol", [{"method": "adaptive",
+                                                "options": {"maximum_iterations": max_iterations, "min_sc_iter": 0}}])
+    previous = None if initial_f_k is None else np.append(np.asarray(initial_f_k, dtype=float), 0.0)
     for i in range(n_states):
         sel = np.flatnonzero(state_n == i)
         if sel.size == 0:
@@ -62,8 +70,14 @@ def effective_bias(u_kn, state_n, run_n, n_states=None, return_frame_weights=Fal
             # Shift every state's energies by their minimum (a constant per state, absorbed in f) so that large
             # reduced energies (temperatures) do not stall pymbar's solvers.
             shifts = u.min(axis=1)
-            mbar = MBAR(u - shifts[:, None], N_k, **mbar_kwargs)
+            start = None
+            if previous is not None:
+                start = previous - shifts
+                start = start - start[0]
+            mbar = MBAR(u - shifts[:, None], N_k, initial_f_k=start, **mbar_kwargs)
             f = np.asarray(mbar.f_k) + shifts
+            if initial_f_k is None:
+                previous = f - f[0]
             log_w = -u[-1] - logsumexp(np.log(N_k[sampled])[:, None] + f[sampled, None] - u[sampled], axis=0)
         bias_ar[i] = f[:-1] - f[-1]
         log_w_n[sel] = log_w - logsumexp(log_w)

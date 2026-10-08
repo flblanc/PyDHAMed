@@ -19,11 +19,13 @@ class DhamedResult:
         partner, are excluded, see eq 10).
     data: the DhamedPairData the likelihood was built from (pair indices refer to included states).
     optimizer: the scipy OptimizeResult of the minimisation of F (eq 12).
+    converged: True if BFGS succeeded or stopped with a gradient below 1e-6 per transition count.
     """
     g: np.ndarray
     included: np.ndarray
     data: object
     optimizer: object
+    converged: bool = True
 
     @property
     def n_states(self):

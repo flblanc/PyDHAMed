@@ -41,6 +41,7 @@ def biased_runs():
 def test_populations_and_compatibility(biased_runs):
     counts, bias = biased_runs
     res = solve_dhamed(counts, bias)
+    assert res.converged
     assert np.allclose(res.populations.sum(), 1.0)
     assert np.allclose(res.populations, P_EXACT, rtol=0.05)
     og = run_dhamed(counts, bias)

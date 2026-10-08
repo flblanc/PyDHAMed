@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import time
 
@@ -69,16 +70,27 @@ effective_log_likelihood_count_ref = effective_log_likelihood_count_list.py_func
 def _loop_grad_dhamed_likelihood_0(grad, g,  ip, jp, ti, tj, vi, vj, nijp):
     """
     Shared inner loop accumulating the pairwise contributions to the gradient
-    of the effective log-likelihood into `grad`.
+    of the effective log-likelihood into `grad`:
+    -nijp * a_i / (a_i + a_j) for state i (and symmetrically for j), with a_i = ti exp(vi - g_i),
+    evaluated as a logistic function of ln a_j - ln a_i so that large biases do not overflow.
     """
     for ipair, i in enumerate(ip):
         j = jp[ipair]
-        vij = np.exp(vj[ipair]-g[j]-vi[ipair]+g[i])
-        # don't think I need to test if ti exists
-        if ti[ipair] > 0:
-            grad[i] += -nijp[ipair] / (1.0 + tj[ipair]*vij/ti[ipair])
-        if tj[ipair] >0 :
-            grad[j] += -nijp[ipair] / (1.0 + ti[ipair]/(vij*tj[ipair]))
+        n = nijp[ipair]
+        if ti[ipair] > 0 and tj[ipair] > 0:
+            d = np.log(tj[ipair]) + vj[ipair] - g[j] - np.log(ti[ipair]) - vi[ipair] + g[i]
+            if d > 0:
+                e = np.exp(-d)
+                grad[i] += -n * e / (1.0 + e)
+                grad[j] += -n / (1.0 + e)
+            else:
+                e = np.exp(d)
+                grad[i] += -n / (1.0 + e)
+                grad[j] += -n * e / (1.0 + e)
+        elif ti[ipair] > 0:
+            grad[i] += -n
+        elif tj[ipair] > 0:
+            grad[j] += -n
     return grad
 
 
@@ -136,18 +148,39 @@ def solve_dhamed(count_list, bias_ar, g_init=None, numerical_gradients=False, ji
     Other keyword arguments are passed as options to scipy.optimize.minimize(method="BFGS").
     """
     n_states = count_list[0].shape[0]
+    bias_ar = np.asarray(bias_ar, dtype=float)
     data, state_index = generate_dhamed_input(count_list, bias_ar, n_states, return_included_state_indices=True)
     included = np.zeros(n_states, dtype=bool)
     included[list(state_index)] = True
     g0 = np.zeros(len(data.nk)) if g_init is None else np.asarray(g_init, dtype=float)[included]
 
+    # A constant added to all biases of a run shifts F by a constant: subtract each run's smallest bias among the
+    # states it visited, which keeps F well scaled for large biases (e.g. temperatures). The result keeps the
+    # unshifted pair data, which the rates (eq 26) need.
+    visited = np.stack(count_list, axis=-1).sum(axis=0) > 0
+    shift = np.where(visited.any(axis=0), np.where(visited, bias_ar, np.inf).min(axis=0), 0.0)
+    opt_data = generate_dhamed_input(count_list, bias_ar - shift[None, :], n_states)
+    # F is linear in the counts: dividing them by the total leaves the optimum unchanged and makes BFGS's absolute
+    # gradient tolerance meaningful whatever the amount of data.
+    scale = 1.0 / max(opt_data.nk.sum(), 1.0)
+    opt_data = dataclasses.replace(opt_data, nk=opt_data.nk * scale, nijp=opt_data.nijp * scale)
+
     start = time.time()
     fprime = None if numerical_gradients else grad_dhamed_likelihood_ref_0
-    result = minimize(wrapper_ll, g0[:-1], args=(data, jit_gradient), jac=fprime, method="BFGS", options=kwargs)
+    kwargs.setdefault("gtol", 1e-9)        # per transition count, after the scaling above
+    result = minimize(wrapper_ll, g0[:-1], args=(opt_data, jit_gradient), jac=fprime, method="BFGS", options=kwargs)
     logger.info("DHAMed: %d states, %d transition pairs, %d iterations, %.2f s",
                 len(data.nk), len(data.ip), result.nit, time.time() - start)
+    # BFGS often stops on "precision loss" once the gradient is at machine precision: judge convergence by the
+    # gradient per transition count instead.
+    converged = bool(result.success or np.abs(result.jac).max() < 1e-6)
+    if not converged:
+        logger.warning("DHAMed optimisation did not converge: %s (max |gradient| %.3g, per transition count). Check "
+                       "the state definitions and connectivity, or pass g_init / maxiter.", result.message,
+                       np.abs(result.jac).max())
     g = np.append(result.x, 0.0)
-    return DhamedResult(g=g - np.log(np.sum(np.exp(g))), included=included, data=data, optimizer=result)
+    return DhamedResult(g=g - np.log(np.sum(np.exp(g))), included=included, data=data, optimizer=result,
+                        converged=converged)
 
 
 def run_dhamed(count_list, bias_ar, numerical_gradients=False, g_init=None,
